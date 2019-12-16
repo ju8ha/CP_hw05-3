@@ -50,12 +50,20 @@ public class VarTable {
 	
 	public String returnIndexOfTempVar(int i) {
 		element element  = tempVar.get(i);
-		return element.varType + " "+ element.varName +";";
+		if(element.check==true) {
+			tempVar.get(i).check = false;
+			return element.varType + " "+ element.varName +";";
+		}
+		return "";
 	}
 	
 	public String returnIndexOfLocalVar(int i) {
 		element element  = localVar.get(i);
-		return element.varType + " "+ element.varName +";";
+		if(element.check==true) {
+			localVar.get(i).check = false;
+			return element.varType + " "+ element.varName +";";
+		}
+		return "";
 	}
 	
 	public String returnStringOfTempVar(String str) {
@@ -74,7 +82,7 @@ public class VarTable {
 	public String returnIndexOfTempVarData(int i) {
 		element element  = tempVar.get(i);
 		if(element.check==true) {
-			element.check=false;
+			tempVar.get(i).check=false;
 			return element.varName+" = "+ element.varValue +";";
 		}
 		else

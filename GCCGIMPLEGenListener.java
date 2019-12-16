@@ -8,8 +8,6 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 
 import generated.MiniCBaseListener;
 import generated.MiniCParser;
-import generated.MiniCParser.ParamsContext;
-import listener.main.SymbolTable.Type;
 
 public class GCCGIMPLEGenListener extends MiniCBaseListener implements ParseTreeListener {
 	ParseTreeProperty<String> newTexts = new ParseTreeProperty<String>(); // children을 저장할 ParseTreeProperty
@@ -42,7 +40,7 @@ public class GCCGIMPLEGenListener extends MiniCBaseListener implements ParseTree
 	}
 
 	@Override
-	public void exitVar_decl(MiniCParser.Var_declContext ctx) {
+	public void exitVar_decl(MiniCParser.Var_declContext ctx) {	//전역 변수
 		String s1, id, s2, lt, s3, semi;
 		if (ctx.getChildCount() == 3) { // type_spec IDENT ';'
 			s1 = newTexts.get(ctx.getChild(0));
@@ -84,8 +82,7 @@ public class GCCGIMPLEGenListener extends MiniCBaseListener implements ParseTree
 	@Override
 	public void exitFun_decl(MiniCParser.Fun_declContext ctx) {
 		// type_spec IDENT '(' params ')' compound_stmt
-		String s1, s2, L_paren, s4, R_paren, s6;
-//		s1 = newTexts.get(ctx.getChild(0));
+		String s2, L_paren, s4, R_paren, s6;
 		s2 = ctx.getChild(1).getText();
 		L_paren = ctx.getChild(2).getText();
 		s4 = newTexts.get(ctx.getChild(3));
@@ -179,19 +176,20 @@ public class GCCGIMPLEGenListener extends MiniCBaseListener implements ParseTree
 		String s1, L_paren, s2, R_paren, s3;
 		// WHILE '(' expr ')' stmt
 		String result = "";
-		for (int i = 0; i < varTable.returnPointer(); i++) {
-			String temp = varTable.returnIndexOfTempVarData(i);
-			if( i != 0 && !temp.equals(""))
-				result += getNumOfDot(depth);
+		while(true) {
+			String temp = varTable.printPointer();
+			String[] array = temp.split("=");
 			if(!temp.equals(""))
 				result += temp+"\n";
+			if(!array[1].contains("D"))
+				break;
 		}
 		s1 = newTexts.get(ctx.getChild(0)); // WHILE
 		L_paren = ctx.getChild(1).getText(); // '('
 		s2 = newTexts.get(ctx.getChild(2)); // expr
 		R_paren = ctx.getChild(3).getText(); // ')'
 		s3 = newTexts.get(ctx.getChild(4)); // stmt
-		newTexts.put(ctx, result+getNumOfDot(depth)+s1 + " " + L_paren + s2 + R_paren + "\n" + s3);
+		newTexts.put(ctx, result+getTab(depth)+s1 + " " + L_paren + s2 + R_paren + "\n" + s3);
 	}
 
 	@Override
@@ -208,24 +206,26 @@ public class GCCGIMPLEGenListener extends MiniCBaseListener implements ParseTree
 			R_brace = ctx.getChild(1).getText();
 			newTexts.put(ctx, L_brace + "\n" + R_brace); // 중괄호만 저장
 		} else if (ctx.getChildCount() == 3) { // local_decl이나 stmt가 하나만 있을 경우
-			L_brace = getNumOfDot(depth - 1) + ctx.getChild(0).getText();
-			s1 = getNumOfDot(depth) + newTexts.get(ctx.getChild(1));
-			R_brace = getNumOfDot(depth - 1) + ctx.getChild(2).getText();
+			L_brace = getTab(depth - 1) + ctx.getChild(0).getText();
+			s1 = getTab(depth) + newTexts.get(ctx.getChild(1));
+			R_brace = getTab(depth - 1) + ctx.getChild(2).getText();
 			newTexts.put(ctx, L_brace + "\n" + s1 + "\n" + R_brace);
 		} else { // local_decl이나 stmt가 하나 이상일 경우
 			String[] array = new String[ctx.getChildCount()];
-			L_brace = getNumOfDot(depth - 1) + ctx.getChild(0).getText();
-			R_brace = getNumOfDot(depth - 1) + ctx.getChild(array.length - 1).getText();
+			L_brace = getTab(depth - 1) + ctx.getChild(0).getText();
+			R_brace = getTab(depth - 1) + ctx.getChild(array.length - 1).getText();
 			array[0] = L_brace; // 배열의 좌측 끝에 시작 중괄호 저장
 			for (int i = 1; i < array.length - 1; i++) { // local_decl 또는 stmt 저장
-				array[i] = getNumOfDot(depth) + newTexts.get(ctx.getChild(i));
+				array[i] = getTab(depth) + newTexts.get(ctx.getChild(i));
 			}
 			array[array.length - 1] = R_brace; // 배열의 우측 끝에 종료 중괄호 저장
 			String result = L_brace; // 좌측 시작 중괄호 값 저장
-			for (int i = 0; i < varTable.tempVarSize(); i++)
-				result += "\n" + getNumOfDot(depth) + varTable.returnIndexOfTempVar(i);
-			for (int i = 0; i < varTable.localVarSize(); i++)
-				result += "\n" + getNumOfDot(depth) + varTable.returnIndexOfLocalVar(i);
+			if( ctx.parent.getChildCount()>1 && ctx.parent.getChild(1).getText().equals("main")) {
+				for (int i = 0; i < varTable.tempVarSize(); i++)	//임시 변수 출력
+					result += "\n" + getTab(depth) + varTable.returnIndexOfTempVar(i);
+				for (int i = 0; i < varTable.localVarSize(); i++)	//지역 변수 출력
+					result += "\n" + getTab(depth) + varTable.returnIndexOfLocalVar(i);
+			}
 			for (int i = 1; i < array.length; i++) { // 좌측 시작 중괄호 이외의 값 저장
 				if(!array[i].equals("\t"))
 					result += "\n" + array[i];
@@ -249,7 +249,6 @@ public class GCCGIMPLEGenListener extends MiniCBaseListener implements ParseTree
 			s2 = ctx.getChild(1).getText();
 			semi = ctx.getChild(2).getText();
 			varTable.addLocalVar(s2, s1);
-//			newTexts.put(ctx,s2 + semi);
 			newTexts.put(ctx, "");
 		} else if (ctx.getChildCount() == 5) {
 			// type_spec IDENT '=' LITERAL ';'
@@ -269,7 +268,7 @@ public class GCCGIMPLEGenListener extends MiniCBaseListener implements ParseTree
 			s5 = ctx.getChild(4).getText();
 			semi = ctx.getChild(5).getText();
 			varTable.addLocalVar(s2+s3+s4+s5, s1);
-			newTexts.put(ctx, s1 + " " + s2 + s3 + s4 + s5 + semi); // 모두 더한 값을 newTexts에 저장
+			newTexts.put(ctx, s2 + s3 + s4 + s5 + semi); // 모두 더한 값을 newTexts에 저장
 		}
 	}
 
@@ -283,12 +282,13 @@ public class GCCGIMPLEGenListener extends MiniCBaseListener implements ParseTree
 		String s1, L_paren, exp, R_paren, st, s2, st2;
 		
 		String result = "";
-		for (int i = 0; i < varTable.returnPointer(); i++) {
-			String temp = varTable.returnIndexOfTempVarData(i);
-			if( i != 0 && !temp.equals(""))
-				result += getNumOfDot(depth);
+		while(true) {
+			String temp = varTable.printPointer();
+			String[] array = temp.split("=");
 			if(!temp.equals(""))
-				result += temp+"\n";
+				result +=  getTab(depth)+temp+"\n";
+			if(!array[1].contains("D"))
+				break;
 		}
 
 		if (ctx.children.size() == 5) {
@@ -300,10 +300,10 @@ public class GCCGIMPLEGenListener extends MiniCBaseListener implements ParseTree
 			if (ctx.getChild(4).getChild(0) instanceof MiniCParser.Compound_stmtContext) { // if로 입력받았을 때 중괄호 입력이 있는 경우
 				st = newTexts.get(ctx.getChild(4));
 			} else { // if로 입력받았을 때 중괄호 입력이 없는 경우
-				st = getNumOfDot(depth) + "{\n" + getNumOfDot(depth + 1) + newTexts.get(ctx.getChild(4)) + "\n"
-						+ getNumOfDot(depth) + "}";
+				st = getTab(depth) + "{\n" + getTab(depth + 1) + newTexts.get(ctx.getChild(4)) + "\n"
+						+ getTab(depth) + "}";
 			}
-			newTexts.put(ctx, result + getNumOfDot(depth) + s1 + " " + L_paren + exp + R_paren + "\n" + st); // 모두 더한 값을 newTexts에 저장
+			newTexts.put(ctx, result + getTab(depth) + s1 + " " + L_paren + exp + R_paren + "\n" + st); // 모두 더한 값을 newTexts에 저장
 		} else {
 			// IF '(' expr ')' stmt ELSE stmt
 			s1 = newTexts.get(ctx.getChild(0));
@@ -313,8 +313,7 @@ public class GCCGIMPLEGenListener extends MiniCBaseListener implements ParseTree
 			st = newTexts.get(ctx.getChild(4));
 			s2 = newTexts.get(ctx.getChild(5));
 			st2 = newTexts.get(ctx.getChild(6));
-			newTexts.put(ctx, result + getNumOfDot(depth) + s1 + " " + "\n" + L_paren + exp + "\n" + R_paren + st + s2 + st2); // 모두 더한 값을 newTexts에
-																									// 저장
+			newTexts.put(ctx, result + getTab(depth)+ s1 + " " + L_paren + exp +R_paren + "\n"+ st +"\n"+getTab(depth)+ s2 +"\n"+ st2);
 		}
 	}
 
@@ -403,7 +402,7 @@ public class GCCGIMPLEGenListener extends MiniCBaseListener implements ParseTree
 								GoOrStop = false;
 							String output = varTable.printPointer();
 							if(!output.equals("")) {
-								result = getNumOfDot(depth) + result;
+								result = getTab(depth) + result;
 								result = output+"\n"+result;
 							}
 						}
@@ -494,7 +493,7 @@ public class GCCGIMPLEGenListener extends MiniCBaseListener implements ParseTree
 		return ctx.getChildCount() == 3 && ctx.getChild(0) != ctx.IDENT() && ctx.getChild(1) != ctx.expr();
 	}
 
-	private String getNumOfDot(int a) { // nesting
+	private String getTab(int a) { // nesting
 		String s = "";
 		for (int i = 0; i < a; i++)
 			s += "	";
